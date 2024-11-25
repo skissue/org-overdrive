@@ -33,45 +33,45 @@
 (require 'ox-html)
 (require 'request)
 
-(defcustom inline-anki-break-consecutive-braces-in-latex
+(defcustom org-overdrive-break-consecutive-braces-in-latex
   nil
   "If non-nil, consecutive `}' will be automatically separated by spaces to prevent early-closing of cloze.
 See https://apps.ankiweb.net/docs/manual.html#latex-conflicts."
   :type 'boolean
-  :group 'inline-anki)
+  :group 'org-overdrive)
 
-(defcustom inline-anki-protected-tags
+(defcustom org-overdrive-protected-tags
   '("marked" "leech")
   "A list of tags that won't be deleted from Anki even though they're absent in Org entries, such as special tags `marked', `leech'."
   :type '(repeat string)
-  :group 'inline-anki)
+  :group 'org-overdrive)
 
-(defcustom inline-anki-ignored-org-tags
+(defcustom org-overdrive-ignored-org-tags
   (append org-export-select-tags org-export-exclude-tags)
   "A list of Org tags that are ignored when constructing notes from entries."
   :type '(repeat string)
-  :group 'inline-anki)
+  :group 'org-overdrive)
 
-(defcustom inline-anki-anki-connect-listening-address
+(defcustom org-overdrive-anki-connect-listening-address
   "127.0.0.1"
   "The network address AnkiConnect is listening."
   :type 'string
-  :group 'inline-anki)
+  :group 'org-overdrive)
 
-(defcustom inline-anki-anki-connect-listening-port
+(defcustom org-overdrive-anki-connect-listening-port
   "8765"
   "The port number AnkiConnect is listening."
   :type 'string
-  :group 'inline-anki)
+  :group 'org-overdrive)
 
-(defcustom inline-anki-use-math-jax nil
+(defcustom org-overdrive-use-math-jax nil
   "Use Anki's built in MathJax support instead of LaTeX."
   :type 'boolean
-  :group 'inline-anki)
+  :group 'org-overdrive)
 
 ;;; AnkiConnect
 
-(defun inline-anki--anki-connect-action (action &optional params version)
+(defun org-overdrive--anki-connect-action (action &optional params version)
   (let (a)
     (when version
       (push `(version . ,version) a))
@@ -79,25 +79,25 @@ See https://apps.ankiweb.net/docs/manual.html#latex-conflicts."
       (push `(params . ,params) a))
     (push `(action . ,action) a)))
 
-(defun inline-anki--anki-connect-invoke-queue ()
+(defun org-overdrive--anki-connect-invoke-queue ()
   (let (action-queue)
     (lambda (&optional action params handler)
       (if action
-          (push (cons (inline-anki--anki-connect-action action params) handler) action-queue)
+          (push (cons (org-overdrive--anki-connect-action action params) handler) action-queue)
         (when action-queue
-          (apply #'inline-anki--anki-connect-invoke-multi (nreverse action-queue))
+          (apply #'org-overdrive--anki-connect-invoke-multi (nreverse action-queue))
           (setq action-queue nil))))))
 
-(defun inline-anki--anki-connect-invoke (action &optional params)
+(defun org-overdrive--anki-connect-invoke (action &optional params)
   "Invoke AnkiConnect with ACTION and PARAMS."
-  (let ((request-body (json-encode (inline-anki--anki-connect-action action params 5)))
+  (let ((request-body (json-encode (org-overdrive--anki-connect-action action params 5)))
         (request-backend 'curl)
         (json-array-type 'list)
         reply err)
 
     (let ((response (request (format "http://%s:%s"
-                                     inline-anki-anki-connect-listening-address
-                                     inline-anki-anki-connect-listening-port)
+                                     org-overdrive-anki-connect-listening-address
+                                     org-overdrive-anki-connect-listening-port)
                       :type "POST"
                       :parser 'json-read
                       :data request-body
@@ -117,23 +117,23 @@ See https://apps.ankiweb.net/docs/manual.html#latex-conflicts."
     (when err (error "Error communicating with AnkiConnect using cURL: %s" err))
     (or reply (error "Got empty reply from AnkiConnect"))))
 
-(defmacro inline-anki--anki-connect-invoke-result (&rest args)
+(defmacro org-overdrive--anki-connect-invoke-result (&rest args)
   "Invoke AnkiConnect with ARGS, return the result from response or raise an error."
-  `(let-alist (inline-anki--anki-connect-invoke ,@args)
+  `(let-alist (org-overdrive--anki-connect-invoke ,@args)
      (when .error (error .error))
      .result))
 
-(defun inline-anki--anki-connect-invoke-multi (&rest actions)
+(defun org-overdrive--anki-connect-invoke-multi (&rest actions)
   (-zip-with (lambda (result handler)
                (when-let ((_ (listp result))
                           (err (alist-get 'error result)))
                  (error err))
                (and handler (funcall handler result)))
-             (inline-anki--anki-connect-invoke-result
+             (org-overdrive--anki-connect-invoke-result
               "multi" `((actions . ,(mapcar #'car actions))))
              (mapcar #'cdr actions)))
 
-(defun inline-anki--anki-connect-map-note (note)
+(defun org-overdrive--anki-connect-map-note (note)
   "Convert NOTE to the form that AnkiConnect accepts."
   (let-alist note
     (list (cons "id" .note-id)
@@ -145,7 +145,7 @@ See https://apps.ankiweb.net/docs/manual.html#latex-conflicts."
           ;; to be type of list.
           (cons "tags" (vconcat .tags)))))
 
-(defun inline-anki--anki-connect-store-media-file (path)
+(defun org-overdrive--anki-connect-store-media-file (path)
   "Store media file for PATH, which is an absolute file name.
 The result is the path to the newly stored media file."
   (let* ((hash (secure-hash 'sha1 path))
@@ -154,7 +154,7 @@ The result is the path to the newly stored media file."
                                   hash
                                   (file-name-extension path t)))
          content)
-    (when (equal :json-false (inline-anki--anki-connect-invoke-result
+    (when (equal :json-false (org-overdrive--anki-connect-invoke-result
                               "retrieveMediaFile"
                               `((filename . ,media-file-name))))
       (message "Storing media file to Anki for %s..." path)
@@ -162,7 +162,7 @@ The result is the path to the newly stored media file."
                      (with-temp-buffer
                        (insert-file-contents path)
                        (buffer-string))))
-      (inline-anki--anki-connect-invoke-result
+      (org-overdrive--anki-connect-invoke-result
        "storeMediaFile"
        `((filename . ,media-file-name)
          (data . ,content))))
@@ -171,18 +171,18 @@ The result is the path to the newly stored media file."
 
 ;;; Org Export Backend
 
-(defconst inline-anki--ox-anki-html-backend
-  (if inline-anki-use-math-jax
+(defconst org-overdrive--ox-anki-html-backend
+  (if org-overdrive-use-math-jax
       (org-export-create-backend
        :parent 'html
-       :transcoders '((latex-fragment . inline-anki--ox-latex-for-mathjax)
-                      (latex-environment . inline-anki--ox-latex-for-mathjax)))
+       :transcoders '((latex-fragment . org-overdrive--ox-latex-for-mathjax)
+                      (latex-environment . org-overdrive--ox-latex-for-mathjax)))
     (org-export-create-backend
      :parent 'html
-     :transcoders '((latex-fragment . inline-anki--ox-latex)
-                    (latex-environment . inline-anki--ox-latex)))))
+     :transcoders '((latex-fragment . org-overdrive--ox-latex)
+                    (latex-environment . org-overdrive--ox-latex)))))
 
-(defun inline-anki--translate-latex-delimiters (latex-code)
+(defun org-overdrive--translate-latex-delimiters (latex-code)
   (catch 'done
     (let ((delimiter-map (list (list (cons (format "^%s" (regexp-quote "$$")) "[$$]")
                                      (cons (format "%s$" (regexp-quote "$$")) "[/$$]"))
@@ -201,7 +201,7 @@ The result is the path to the newly stored media file."
           (when matched (throw 'done latex-code)))))
     latex-code))
 
-(defun inline-anki--translate-latex-delimiters-to-anki-mathjax-delimiters (latex-code)
+(defun org-overdrive--translate-latex-delimiters-to-anki-mathjax-delimiters (latex-code)
   (catch 'done
     (let ((delimiter-map (list (list (cons (format "^%s" (regexp-quote "$$")) "\\[")
                                      (cons (format "%s$" (regexp-quote "$$")) "\\]"))
@@ -216,51 +216,51 @@ The result is the path to the newly stored media file."
           (when matched (throw 'done latex-code)))))
     latex-code))
 
-(defun inline-anki--wrap-latex (content)
+(defun org-overdrive--wrap-latex (content)
   "Wrap CONTENT with Anki-style latex markers."
   (format "<p><div>[latex]</div>%s<div>[/latex]</div></p>" content))
 
-(defun inline-anki--wrap-latex-for-mathjax (content)
+(defun org-overdrive--wrap-latex-for-mathjax (content)
   "Wrap CONTENT for Anki's native MathJax support."
   (format "<p>%s</p>" content))
 
-(defun inline-anki--wrap-div (content)
+(defun org-overdrive--wrap-div (content)
   (format "<div>%s</div>" content))
 
-(defun inline-anki--ox-latex (latex _contents _info)
+(defun org-overdrive--ox-latex (latex _contents _info)
   "Transcode LATEX from Org to HTML.
 CONTENTS is nil.  INFO is a plist holding contextual information."
   (let ((code (org-remove-indentation (org-element-property :value latex))))
     (setq code
           (pcase (org-element-type latex)
-            ('latex-fragment (inline-anki--translate-latex-delimiters code))
-            ('latex-environment (inline-anki--wrap-latex
-                                 (mapconcat #'inline-anki--wrap-div
+            ('latex-fragment (org-overdrive--translate-latex-delimiters code))
+            ('latex-environment (org-overdrive--wrap-latex
+                                 (mapconcat #'org-overdrive--wrap-div
                                             (split-string (org-html-encode-plain-text code) "\n")
                                             "")))))
 
-    (if inline-anki-break-consecutive-braces-in-latex
+    (if org-overdrive-break-consecutive-braces-in-latex
         (replace-regexp-in-string "}}" "} } " code)
       code)))
 
-(defun inline-anki--ox-latex-for-mathjax (latex _contents _info)
+(defun org-overdrive--ox-latex-for-mathjax (latex _contents _info)
   "Transcode LATEX from Org to HTML.
 CONTENTS is nil.  INFO is a plist holding contextual information."
   (let ((code (org-remove-indentation (org-element-property :value latex))))
     (setq code
           (pcase (org-element-type latex)
-            ('latex-fragment (inline-anki--translate-latex-delimiters-to-anki-mathjax-delimiters code))
-            ('latex-environment (inline-anki--wrap-latex-for-mathjax
-                                 (mapconcat #'inline-anki--wrap-div
+            ('latex-fragment (org-overdrive--translate-latex-delimiters-to-anki-mathjax-delimiters code))
+            ('latex-environment (org-overdrive--wrap-latex-for-mathjax
+                                 (mapconcat #'org-overdrive--wrap-div
                                             (split-string (org-html-encode-plain-text code) "\n")
                                             "")))))
 
-    (if inline-anki-break-consecutive-braces-in-latex
+    (if org-overdrive-break-consecutive-braces-in-latex
         (replace-regexp-in-string "}}" "} } " code)
       code)))
 
 ;; For use during html export
-(defun inline-anki--ox-html-link (oldfun link desc info)
+(defun org-overdrive--ox-html-link (oldfun link desc info)
   "When LINK is a link to local file, transcodes it to html and stores the target file to Anki, otherwise calls OLDFUN for help.
 The implementation is borrowed and simplified from ox-html."
 
@@ -284,7 +284,7 @@ The implementation is borrowed and simplified from ox-html."
                                (file-name-absolute-p raw-path))
                       (setq raw-path (concat (file-name-as-directory home) raw-path)))
                     ;; storing file to Anki and return the modified path
-                    (inline-anki--anki-connect-store-media-file (expand-file-name (url-unhex-string raw-path)))))
+                    (org-overdrive--anki-connect-store-media-file (expand-file-name (url-unhex-string raw-path)))))
                  (t (throw 'giveup nil))))
                (attributes-plist
                 (let* ((parent (org-export-get-parent-element link))
@@ -328,22 +328,22 @@ The implementation is borrowed and simplified from ox-html."
 
 ;;; Core Functions
 
-(defun inline-anki--create-note (note)
+(defun org-overdrive--create-note (note)
   "Request AnkiConnect for creating NOTE."
-  (let ((queue (inline-anki--anki-connect-invoke-queue)))
+  (let ((queue (org-overdrive--anki-connect-invoke-queue)))
     (funcall queue
              'addNote
-             `((note . ,(inline-anki--anki-connect-map-note note)))
-             #'inline-anki--dangerously-write-id)
+             `((note . ,(org-overdrive--anki-connect-map-note note)))
+             #'org-overdrive--dangerously-write-id)
 
     (funcall queue)))
 
-(defun inline-anki--update-note (note)
+(defun org-overdrive--update-note (note)
   "Request AnkiConnect for updating fields and tags of NOTE."
-  (let ((queue (inline-anki--anki-connect-invoke-queue)))
+  (let ((queue (org-overdrive--anki-connect-invoke-queue)))
     (funcall queue
              'updateNoteFields
-             `((note . ,(inline-anki--anki-connect-map-note note))))
+             `((note . ,(org-overdrive--anki-connect-map-note note))))
 
     (funcall queue
              'notesInfo
@@ -353,11 +353,11 @@ The implementation is borrowed and simplified from ox-html."
                (let* ((existing-note (car result))
                       (tags-to-add (-difference (-difference (alist-get 'tags note)
                                                              (alist-get 'tags existing-note))
-                                                inline-anki-ignored-org-tags))
+                                                org-overdrive-ignored-org-tags))
                       (tags-to-remove (-difference (-difference (alist-get 'tags existing-note)
                                                                 (alist-get 'tags note))
-                                                   inline-anki-protected-tags))
-                      (tag-queue (inline-anki--anki-connect-invoke-queue)))
+                                                   org-overdrive-protected-tags))
+                      (tag-queue (org-overdrive--anki-connect-invoke-queue)))
 
                  (when tags-to-add
                    (funcall tag-queue
@@ -378,7 +378,7 @@ The implementation is borrowed and simplified from ox-html."
              (lambda (cards)
                ;; suspend or unsuspend
                (if cards
-                   (let ((card-queue (inline-anki--anki-connect-invoke-queue)))
+                   (let ((card-queue (org-overdrive--anki-connect-invoke-queue)))
                      (if (alist-get 'suspend? note)
                          (funcall card-queue
                                   'suspend
