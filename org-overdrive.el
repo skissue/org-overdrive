@@ -93,7 +93,7 @@ that fact."
   :type '(repeat string))
 
 (defcustom org-overdrive-cloze-fields
-  '(("Outline" . org-overdrive-filename-as-link)
+  '(("Outline" . org-overdrive-outline-at-point)
     ("Text" . t))
   "Alist specifying note fields and how to populate them.
 The cdrs may be either t, a string or a function.  The symbol t
@@ -337,9 +337,13 @@ Will be passed through `format-time-string'.  Cannot be nil."
             input
             signal))))
 
-(defun org-overdrive-filename-as-link ()
-  "Return the buffer filename wrapped in <a href>."
-  (concat "<a href=\"file://" buffer-file-name "\">" buffer-file-name "</a>"))
+(defun org-overdrive-outline-at-point ()
+  "Return the Org heading outline at point."
+  (let ((outline (list (org-get-title))))
+    (save-excursion
+      (while (org-up-heading-safe)
+        (push (org-no-properties (org-get-heading)) outline)))
+    (string-join (nreverse outline) " > ")))
 
 (defun org-overdrive-check ()
   "Check that everything is ready, else return nil."
