@@ -423,7 +423,7 @@ Will be passed through `format-time-string'.  Cannot be nil."
 Argument CALLED-INTERACTIVELY sets itself."
   (interactive "p")
   (require 'org)
-  (require 'org-overdrive-anki-editor-fork)
+  (require 'org-overdrive-api)
   (when (or (not called-interactively)
             (org-overdrive-check))
     (setq org-overdrive--known-flashcard-places nil)
