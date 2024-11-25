@@ -133,12 +133,6 @@ Will be passed through `format-time-string'.  Cannot be nil."
 (defconst org-overdrive-list-bullet-re
   (rx (or (any "-+*") (seq (*? digit) (any ").") " "))))
 
-(defconst org-overdrive-rx-item-start-new
-  (rx bol (*? space) (regexp org-overdrive-list-bullet-re) (*? space) "@anki "))
-
-(defconst org-overdrive-rx-item-start
-  (rx bol (*? space) (?? "# ") (*? space) (regexp org-overdrive-list-bullet-re) (*? space) "@^{" (group (= 13 digit)) "}"))
-
 (defconst org-overdrive-rx-eol-new
   (rx (or "@anki" "^{anki}") (*? space) eol))
 
@@ -162,9 +156,7 @@ Will be passed through `format-time-string'.  Cannot be nil."
   (occur (rx (or (regexp org-overdrive-rx-struct)
                  (regexp org-overdrive-rx-struct-new)
                  (regexp org-overdrive-rx-eol)
-                 (regexp org-overdrive-rx-eol-new)
-                 (regexp org-overdrive-rx-item-start)
-                 (regexp org-overdrive-rx-item-start-new)))))
+                 (regexp org-overdrive-rx-eol-new)))))
 
 ;;;###autoload
 (defun org-overdrive-rgrep ()
@@ -176,9 +168,7 @@ Will be passed through `format-time-string'.  Cannot be nil."
             (rx (or (regexp org-overdrive-rx-struct)
                     (regexp org-overdrive-rx-struct-new)
                     (regexp org-overdrive-rx-eol)
-                    (regexp org-overdrive-rx-eol-new)
-                    (regexp org-overdrive-rx-item-start)
-                    (regexp org-overdrive-rx-item-start-new))))
+                    (regexp org-overdrive-rx-eol-new))))
            "*.org")))
 
 ;; This does its own regexp searches because it's used as a callback with no
@@ -361,20 +351,6 @@ value of -1), create it."
   ;; cycles because you submit the new ones twice
   (save-mark-and-excursion
     (+
-     (cl-loop initially (goto-char (point-min))
-              while (re-search-forward org-overdrive-rx-item-start nil t)
-              count (org-overdrive--push-note
-                     :field-beg (point)
-                     :field-end (line-end-position)
-                     :note-id (string-to-number (match-string 1))))
-
-     (cl-loop initially (goto-char (point-min))
-              while (re-search-forward org-overdrive-rx-item-start-new nil t)
-              count (org-overdrive--push-note
-                     :field-beg (point)
-                     :field-end (line-end-position)
-                     :note-id -1))
-
      (cl-loop initially (goto-char (point-min))
               while (re-search-forward org-overdrive-rx-eol nil t)
               count (org-overdrive--push-note
