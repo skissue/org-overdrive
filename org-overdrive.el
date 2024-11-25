@@ -25,7 +25,7 @@
 
 ;;; Commentary:
 
-;; Custom fork of inline-anki
+;; Custom, opinionated fork of inline-anki
 
 ;;; Code:
 
