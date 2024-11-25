@@ -393,6 +393,15 @@ The implementation is borrowed and simplified from ox-html."
 
     (funcall queue)))
 
+(defun org-overdrive--delete-note (note-id)
+  "Request AnkiConnect to delete NOTE-ID."
+  (let ((queue (org-overdrive--anki-connect-invoke-queue)))
+    (funcall queue
+             'deleteNotes
+             `((notes . (,note-id)))
+             #'org-overdrive--dangerously-write-id)
+
+    (funcall queue)))
 
 (provide 'org-overdrive-api)
 

@@ -501,6 +501,16 @@ asyncloop LOOP, repeat until the file list is empty."
   (unless (get-buffer-window "*org-overdrive*" 'visible)
     (display-buffer "*org-overdrive*")))
 
+;;;###autoload
+(defun org-overdrive-delete-note-here ()
+  "Delete inline cloze note on current line."
+  (interactive)
+  (save-excursion
+    (beginning-of-line)
+    (unless (re-search-forward org-overdrive-rx-eol (line-end-position) t)
+      (user-error "No card found on current line"))
+    (org-overdrive--delete-note (string-to-number (match-string 1)))))
+
 (provide 'org-overdrive)
 
 ;;; org-overdrive.el ends here
