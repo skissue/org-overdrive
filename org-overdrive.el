@@ -38,17 +38,17 @@
   "Customizations for org-overdrive."
   :group 'org)
 
-(defcustom org-overdrive-deck "Default"
-  "Name of deck to upload to."
+(defcustom org-overdrive-default-deck "Default"
+  "Name of default deck to upload to."
   :type 'string)
 
-(defcustom org-overdrive-note-type "Cloze from Outer Space"
-  "Name of your cloze note type.
+(defcustom org-overdrive-default-cloze-note-type "Overdrive Cloze"
+  "Name of default cloze note type.
 Will fail silently if the note type doesn't exist, so get it
 right!"
   :type 'string)
 
-(defcustom org-overdrive-emphasis-type "_"
+(defcustom org-overdrive-inline-emphasis-type "_"
   "The kind of emphasis you want to indicate a cloze deletion.
 Whatever you choose, it MUST be found in `org-emphasis-alist' and
 can only be one character long."
@@ -92,8 +92,8 @@ backup and auto-save files ending in ~ or # are already barred by
 that fact."
   :type '(repeat string))
 
-(defcustom org-overdrive-fields
-  '(("Source" . org-overdrive-filename-as-link)
+(defcustom org-overdrive-cloze-fields
+  '(("Outline" . org-overdrive-filename-as-link)
     ("Text" . t))
   "Alist specifying note fields and how to populate them.
 The cdrs may be either t, a string or a function.  The symbol t
@@ -224,7 +224,7 @@ To get the Anki default of three dots, set this variable to nil."
     (let ((n 0))
       (goto-char (point-min))
       (while (re-search-forward org-emph-re nil t)
-        (when (equal (match-string 3) org-overdrive-emphasis-type)
+        (when (equal (match-string 3) org-overdrive-inline-emphasis-type)
           (let ((truth (match-string 4)))
             (replace-match (concat "{{c"
                                    (number-to-string (cl-incf n))
@@ -273,8 +273,8 @@ value of -1), create it."
              #'org-overdrive--create-note
            #'org-overdrive--update-note)
          (list
-          (cons 'deck org-overdrive-deck)
-          (cons 'note-type org-overdrive-note-type)
+          (cons 'deck org-overdrive-default-deck)
+          (cons 'note-type org-overdrive-default-cloze-note-type)
           (cons 'note-id note-id)
           (cons 'tags
                 (delq nil
@@ -297,7 +297,7 @@ value of -1), create it."
                                        (org-get-tags)
                                        :test #'string-equal-ignore-case)))))))
           (cons 'fields (cl-loop
-                         for (field . value) in org-overdrive-fields
+                         for (field . value) in org-overdrive-cloze-fields
                          as string = (org-overdrive--instantiate value)
                          if (eq t value)
                          collect (cons field html)
@@ -325,7 +325,7 @@ Will be passed through `format-time-string'.  Cannot be nil."
                  (funcall input))))
             ((null input)
              (display-warning
-              'org-overdrive "A cdr of `org-overdrive-fields' appears to be nil")
+              'org-overdrive "A cdr of `org-overdrive-cloze-fields' appears to be nil")
              "")
             ((listp input)
              (eval input t))
@@ -333,7 +333,7 @@ Will be passed through `format-time-string'.  Cannot be nil."
     ;; IME this is a common source of errors (and I'm the package dev!), so
     ;; help tell the user where the error's coming from.
     ((error debug)
-     (error "There was likely a problem evaluating a member of `org-overdrive-fields':  %s signaled %s"
+     (error "There was likely a problem evaluating a member of `org-overdrive-cloze-fields':  %s signaled %s"
             input
             signal))))
 
@@ -343,7 +343,7 @@ Will be passed through `format-time-string'.  Cannot be nil."
 
 (defun org-overdrive-check ()
   "Check that everything is ready, else return nil."
-  (cl-assert (member org-overdrive-emphasis-type
+  (cl-assert (member org-overdrive-inline-emphasis-type
                      (mapcar #'car org-emphasis-alist)))
   (cl-assert (executable-find "ps"))
   (if (not (string-empty-p (shell-command-to-string "ps -e | grep anki")))
