@@ -337,13 +337,13 @@ value of -1), create it."
 
 (defun org-overdrive-check ()
   "Check that everything is ready, else return nil."
-  (cl-assert (member org-overdrive-inline-emphasis-type
-                     (mapcar #'car org-emphasis-alist)))
-  (cl-assert (executable-find "ps"))
-  (if (not (string-empty-p (shell-command-to-string "ps -e | grep anki")))
-      t
-    (message "Anki doesn't seem to be running")
-    nil))
+  (unless (assoc org-overdrive-inline-emphasis-type
+                 org-emphasis-alist)
+    (user-error "Invalid value for `org-overdrive-inline-emphasis-type'"))
+  (unless (executable-find "pgrep")
+    (user-error "Could not find executable `pgrep'"))
+  (when (string-empty-p (shell-command-to-string "pgrep anki"))
+    (user-error "Anki doesn't seem to be running")))
 
 (defun org-overdrive-push-notes-in-buffer-1 ()
   "Push notes in buffer, and return the count of pushes made."
@@ -404,25 +404,24 @@ value of -1), create it."
   "Push all flashcards in the buffer to Anki.
 Argument CALLED-INTERACTIVELY sets itself."
   (interactive "p")
-  (when (or (not called-interactively)
-            (org-overdrive-check))
-    (setq org-overdrive--known-flashcard-places nil)
-    (unless (file-writable-p buffer-file-name)
-      (error "Can't write to path (no permissions?): %s"
-             buffer-file-name))
-    (let (pushed
-          (already-modified (buffer-modified-p)))
-      (unwind-protect
-          (progn
-            (advice-add 'org-html-link :around #'org-overdrive--ox-html-link)
-            (setq pushed (org-overdrive-push-notes-in-buffer-1)))
-        (advice-remove 'org-html-link #'org-overdrive--ox-html-link))
-      (if already-modified
-          (message "Not saving buffer %s" (current-buffer))
-        (save-buffer))
-      (if called-interactively
-          (message "Pushed %d notes!" pushed)
-        pushed))))
+  (org-overdrive-check)
+  (setq org-overdrive--known-flashcard-places nil)
+  (unless (file-writable-p buffer-file-name)
+    (error "Can't write to path (no permissions?): %s"
+           buffer-file-name))
+  (let (pushed
+        (already-modified (buffer-modified-p)))
+    (unwind-protect
+        (progn
+          (advice-add 'org-html-link :around #'org-overdrive--ox-html-link)
+          (setq pushed (org-overdrive-push-notes-in-buffer-1)))
+      (advice-remove 'org-html-link #'org-overdrive--ox-html-link))
+    (if already-modified
+        (message "Not saving buffer %s" (current-buffer))
+      (save-buffer))
+    (if called-interactively
+        (message "Pushed %d notes!" pushed)
+      pushed)))
 
 (defvar org-overdrive--directory nil
   "Directory in which to look for Org files.
@@ -495,12 +494,12 @@ asyncloop LOOP, repeat until the file list is empty."
   "Push notes from every file in DIR and nested subdirs."
   (interactive "DSend flashcards from all files in directory: ")
   (setq org-overdrive--directory dir)
-  (when (org-overdrive-check)
-    (asyncloop-run (list #'org-overdrive--prep-file-list
-                         #'org-overdrive--next)
-      :log-buffer-name "*org-overdrive*")
-    (unless (get-buffer-window "*org-overdrive*" 'visible)
-      (display-buffer "*org-overdrive*"))))
+  (org-overdrive-check)
+  (asyncloop-run (list #'org-overdrive--prep-file-list
+                       #'org-overdrive--next)
+    :log-buffer-name "*org-overdrive*")
+  (unless (get-buffer-window "*org-overdrive*" 'visible)
+    (display-buffer "*org-overdrive*")))
 
 (provide 'org-overdrive)
 
