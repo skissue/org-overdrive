@@ -30,6 +30,9 @@
 ;;; Code:
 
 (require 'asyncloop)
+(require 'org)
+(require 'org-overdrive-api)
+(require 'pcre2el)
 
 (defgroup org-overdrive nil
   "Customizations for org-overdrive."
@@ -153,7 +156,6 @@ fields than this variable has, they will not be edited."
 (defun org-overdrive-rgrep ()
   "Find all flashcards in current directory and descendants."
   (interactive)
-  (require 'pcre2el)
   ;; Override rgrep's command to add -P for PCRE
   (let ((grep-find-template "find -H <D> <X> -type f <F> -exec grep <C> -nH -P --null -e <R> \\{\\} +"))
     (rgrep (rxt-elisp-to-pcre
@@ -422,8 +424,6 @@ Will be passed through `format-time-string'.  Cannot be nil."
   "Push all flashcards in the buffer to Anki.
 Argument CALLED-INTERACTIVELY sets itself."
   (interactive "p")
-  (require 'org)
-  (require 'org-overdrive-api)
   (when (or (not called-interactively)
             (org-overdrive-check))
     (setq org-overdrive--known-flashcard-places nil)
@@ -514,7 +514,6 @@ asyncloop LOOP, repeat until the file list is empty."
 (defun org-overdrive-push-notes-in-directory (dir)
   "Push notes from every file in DIR and nested subdirs."
   (interactive "DSend flashcards from all files in directory: ")
-  (require 'org)
   (setq org-overdrive--directory dir)
   (when (org-overdrive-check)
     (asyncloop-run (list #'org-overdrive--prep-file-list
