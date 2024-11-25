@@ -116,6 +116,20 @@ fields than this variable has, they will not be edited."
                               (const :tag "The full HTML content" t)
                               sexp)))
 
+(defcustom org-overdrive-occluder
+  #'org-overdrive-dots-logarithmic
+  "Function that occludes a string, for use in cloze.
+Takes the string to be occluded \(replaced by dots or whatever).
+
+To get the Anki default of three dots, set this variable to nil."
+  :type '(choice function
+                 (const :tag "Anki default of three dots" nil)))
+
+(defcustom org-overdrive-extra-tag "from-emacs-%F"
+  "Tag added to every note sent to Anki.
+Will be passed through `format-time-string'.  Cannot be nil."
+  :type 'string)
+
 (defconst org-overdrive-list-bullet-re
   (rx (or (any "-+*") (seq (*? digit) (any ").") " "))))
 
@@ -198,15 +212,6 @@ fields than this variable has, they will not be edited."
 Longer TEXT means more dots, but along a log-2 algorithm so it
 doesn't get crazy-long in extreme cases."
   (make-string (max 3 (* 2 (round (log (length text) 2)))) ?\.))
-
-(defcustom org-overdrive-occluder
-  #'org-overdrive-dots-logarithmic
-  "Function that occludes a string, for use in cloze.
-Takes the string to be occluded \(replaced by dots or whatever).
-
-To get the Anki default of three dots, set this variable to nil."
-  :type '(choice function
-                 (const :tag "Anki default of three dots" nil)))
 
 (defconst org-overdrive-rx-comment-glyph
   (rx bol (*? space) "# "))
@@ -308,11 +313,6 @@ value of -1), create it."
                             (looking-at-p org-overdrive-rx-comment-glyph))))))
     (message "No implicit clozes found, skipping:  %s" text)
     nil))
-
-(defcustom org-overdrive-extra-tag "from-emacs-%F"
-  "Tag added to every note sent to Anki.
-Will be passed through `format-time-string'.  Cannot be nil."
-  :type 'string)
 
 (defun org-overdrive--instantiate (input)
   "Return INPUT if it's a string, else funcall or eval it."
